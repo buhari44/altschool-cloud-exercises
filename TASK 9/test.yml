@@ -1,0 +1,19 @@
+---
+- name: setup web server
+  hosts: all
+  remote_user: vagrant
+  become: yes
+
+  tasks:
+  - name: Install apache2 Server
+    apt: name=apache2 update_cache=yes state=latest
+
+  - name: Set timezone 
+    timezone:
+     name: Africa/Lagos
+
+  - name: Host a php file
+    copy:
+     src: /index.php
+     dest: /vagrant/home 
+ 
