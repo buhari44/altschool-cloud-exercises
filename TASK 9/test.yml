@@ -1,19 +1,50 @@
 ---
-- name: setup web server
-  hosts: all
-  remote_user: vagrant
+hosts: ip
   become: yes
 
   tasks:
-  - name: Install apache2 Server
-    apt: name=apache2 update_cache=yes state=latest
+  - name: Install Apache latest version
+    apt:
+      name: apache2
+      state: present
 
-  - name: Set timezone 
+  - name: Start apache2
+    service:
+      name: apache2
+      state: started
+
+
+  - name: Update timezone
     timezone:
-     name: Africa/Lagos
+      name: Africa/Lagos
 
-  - name: Host a php file
+  - name: Get timezone
+    command: timedatectl
+  
+  - name: install software packages
+    apt:
+      name: software-properties-common
+ 
+  - name: Add repository ppa:ondrej/php
+    apt_repository:
+      repo: "ppa:ondrej/php"
+      state: present
+
+  - name: Update cache 
+    apt:
+      update_cache: yes
+      
+
+  - name: Install php8.0                     
+    apt:
+      name: php8.1
+      state: present
+
+
+
+  - name: Copy and replace on apache server
     copy:
-     src: /index.php
-     dest: /vagrant/home 
+      src: /home/vagrant/index.php
+      dest: /var/www/html/index.php
+
  
