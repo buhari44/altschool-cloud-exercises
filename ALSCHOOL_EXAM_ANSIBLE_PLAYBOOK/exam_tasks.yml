@@ -1,0 +1,362 @@
+
+
+
+
+   
+---
+- name: Deploy a LAMP server
+  hosts: examServer 
+  become: yes
+  vars_files:
+     vars/main.yml
+
+
+ 
+  tasks:
+   - name: update cache
+     apt:
+       update_cache: yes
+   
+   - name: Allow everything and enable UFW
+     ufw:
+       state: enabled
+       policy: allow
+ 
+   - name: Install Apache/Http Server
+     apt:
+       name: apache2
+       state: present
+
+   - name: Allow all access to tcp port 80
+     ufw:
+       rule: allow
+       port: '80'
+       
+
+   - name: Allow all access to tcp port 443
+     ufw:
+       rule: allow
+       port: '443'
+       
+
+   
+   - name: Install software packeges
+     apt:
+       name: software-properties-common
+
+
+   - name: Install Mariadb server
+     apt:
+       name: "{{ item }}"
+       update_cache: yes
+     loop: [ 'mariadb-server', 'python3-pymysql', 'php-mysql' ]
+       
+   - name: Start mysql server
+     service:
+       name: mysql
+       state: started
+       enabled: true
+   
+
+
+  # - name: Create .my.cnf file with root password credentials
+    # template:
+      # src: /home/vagrant/my.cnf
+      # dest: /root/.my.cnf
+      # owner: root
+      # group: root
+      # mode: 0600
+    
+
+
+  # - name: update mysql root password for all root accounts
+   #  mysql_user:
+    #    login_user: root
+     #   login_password: ''
+      #  name: root
+       # host: "{{ item }}"
+        #password: "{{ mysql_root_password }}"
+     #   check_implicit_admin: yes
+      #  priv: "*.*:ALL,GRANT"
+    # with_items:
+     #   - ansible_hostname
+      #  - 127.0.0.1
+       # - ::1
+       # - localhost  
+   
+   - name: Start mysql server
+     service:
+       name: mysql
+       state: started
+       enabled: true
+
+
+   - name: Change the authentication plugin of mysql
+     shell: mysql -u root -e 'UPDATE mysql.user SET plugin="mysql_native_password" WHERE user="root" AND host="localhost"'
+     ignore_errors: true   
+  
+    
+   - name: Set root password
+     mysql_user:
+       login_host: 'localhost'
+       login_user: 'root'
+       login_password: 'root'
+       name: root
+       password: 'root'
+       state: present
+       login_unix_socket: /var/run/mysqld/mysqld.sock
+
+   - name: Remove all anonymous user accounts
+     mysql_user:   
+       name: ''    
+       host_all: yes
+       state: absent
+       login_user: root
+       login_password: 'root'
+       
+
+   - name: CRAETE DATABASE AND NEW USER IN MYSQL
+     mysql_user:
+       login_host: 'localhost'
+       name: 'adeyemibuhari'
+       password: 'adeyemibuhari'
+       state: present
+       login_user: root
+       login_password: 'root'
+       
+
+   - name: Create new database adeyemibuhari
+     mysql_db:
+       name: 'adeyemibuhari'
+       login_host: 'localhost'
+       state: present
+       login_user: root
+       login_password: 'root'
+
+   - name: Grant user all access
+     mysql_user:
+       name: 'adeyemibuhari'
+       login_host: 'localhost'
+       state: present
+       login_user: root
+       login_password: 'root'
+       priv: 'adeyemibuhari.*:ALL,GRANT'
+
+        
+  # - name: secure mariadb
+    # expect:
+      # command: mysql_secure_installation
+      # responses:
+        # (?i)Enter current password for root: ''
+        # (?i)Change the root password: "y"
+        # (?i)New passord: "isphanggge"
+       #  (?i)Re-enter password: "isphanggge"
+        # (?i)Remove anonymous users: "y"
+        # (?i)Disallow root login remotely: "y"
+        # (?i)Remove test database: "y"
+      #   (?i)Reload privilege tables now: "y"
+     #  timeout: 1
+    # register: secure_mariadb
+   #  failed_when: "'... Failed!' in secure_mariadb.stdout_lines"   
+
+   
+   - name: Add apt php repository
+     apt_repository: 
+       repo: ppa:ondrej/php
+       state: present
+
+   - name: Install PHP and packages
+     apt: 
+       name: "{{ item }}"
+       update_cache: yes
+     loop: [ 'libapache2-mod-php', 'php', 'git', 'php-curl', 'php-cli', 'php-common', 'php-xml', 'php-mysql', 'php-gd', 'php8.1-opcache', 'php-mbstring', 'php-tokenizer', 'php-json', 'php-bcmath', 'php-zip', 'unzip' ]
+       
+        
+   - name: Download Composer Installer
+     get_url:
+       url: https://getcomposer.org/installer
+       dest: /tmp/composer
+
+   - name: Install Composer
+     shell: php /tmp/composer --install-dir=/usr/local/bin
+
+   - name: Move composer 
+     shell: mv /usr/local/bin/composer.phar /usr/local/bin/composer
+
+   - name: Set permission for composer file
+     file:
+       path: /usr/local/bin/composer
+       mode: a+x
+       state: file
+          
+   - name: Clone the project repo
+     git:
+       repo: https://github.com/f1amy/laravel-realworld-example-app.git
+       dest: /var/www/adeyemibuhari
+  
+   - name: Copy htaccess file
+     copy:
+       src: /home/vagrant/htaccess
+       dest: /var/www/adeyemibuhari/.htaccess
+
+   - name: delete web.php
+     file: 
+       path: /var/www/adeyemibuhari/routes/web.php
+       state: absent
+
+   - name: Copy /routes/web.php
+     copy:
+       src: /home/vagrant/web.php
+       dest: /var/www/adeyemibuhari/routes/web.php
+
+   - name: Change the ownership of the project folder
+     file:
+       path: /var/www/adeyemibuhari
+       recurse: yes
+       owner: www-data
+       group: www-data
+       mode: '0755'
+  
+  
+   - name: Set permission for laravelApp storage
+     file: 
+       path: /var/www/adeyemibuhari/storage
+       recurse: yes
+       mode: '0775'
+
+
+
+   - name: Set permission for laravelApp storage
+     file:
+       path: /var/www/adeyemibuhari/bootstrap/cache
+       recurse: yes
+       mode: '0777'
+
+#   - name: Delete composer.lock file
+ #    file:
+  #     path: /var/www/html/laravelApp/composer.lock
+   #    state: absent
+       
+
+   #- name: Install laravel dependencies
+    # composer:
+   #    command: update
+  #     working_dir: /var/www/html/laravelApp
+      # prefer_dist: true
+       #optimize_autoloader: true
+      # no_dev: true
+      # no_scripts: true
+    # become: false
+
+     
+   - name: Ansible replace string example
+     replace:
+       path: /etc/php/8.1/apache2/php.ini
+       regexp: '; cgi.fix_pathinfo=0'
+       replace: " cgi.fix_pathinfo=1"
+
+   - name: Restart apache webserver
+     service:
+       name: apache2
+       state: restarted
+   
+   - name: Copy conf file into the server
+     copy:
+       src: /home/vagrant/laravelApp.conf
+       dest: /etc/apache2/sites-available/adeyemibuhari.conf
+       mode: '0664'
+ 
+   - name: Update a2ensite
+     command: a2ensite adeyemibuhari.conf
+  
+  
+   - name: Disable apachedefault page
+     command: a2dissite 000-default.conf
+
+   - name: Enable apache rewrite module
+     command: a2enmod rewrite
+
+   - name: Restart apache webserver
+     service:
+       name: apache2
+       state: restarted
+  
+   - name: Copy env file
+     copy:
+       src: /var/www/adeyemibuhari/.env.example
+       remote_src: yes
+       dest: /var/www/adeyemibuhari/.env
+
+   - name: Copy env file
+     copy:
+       src: /home/vagrant/env
+       dest: /var/www/adeyemibuhari/.env
+
+   
+
+ #  - name: Install laravel dependencies
+  #   expect:
+   #    chdir: /var/www/adeyemibuhari
+    #   command: sudo composer update
+     #  responses:
+      #   (?i)Continue as root/super user: "yes"
+
+   - name: Composer update
+     shell: composer update --no-interaction
+     args:
+       chdir: /var/www/adeyemibuhari
+
+  
+   - name: Composer install
+     shell: composer install --no-interaction
+     args:
+       chdir: /var/www/adeyemibuhari
+
+   - name: Composer create projet
+     shell: composer create-project --no-interaction
+     args:
+       chdir: /var/www/adeyemibuhari
+
+   - name: Migrate database
+     shell: |
+        php artisan migrate
+        php artisan migrate --seed
+     args:
+       chdir: /var/www/adeyemibuhari
+
+
+   - name: enable the new config
+     shell: |
+       a2ensite adeyemibuhari.conf
+       a2dissite 000-default.conf
+       a2enmod rewrite
+       service apache2 restart
+
+
+   - name: Stop apache web server
+     service:
+       name: apache2
+       state: stopped
+       
+ 
+   - name : Install certbot Python Package
+     apt:
+       name: certbot python3-certbot-apache
+       update_cache: yes
+       state: latest
+
+   - name: Obtain certbot certificate
+     shell: certbot --apache adeyemibuhari.me
+
+   - name: Stop apache web server
+     service:
+       name: apache2
+       state: restarted
+
+ 
+   
+ 
+   
+   
+
+     

@@ -6,9 +6,8 @@
 echo $dt
  
 
-   if [ $dt -eq 16 ]
+   if [ $dt -eq 1 ]
  then
- 
   true > /home/vagrant/memory_logs.txt
 else 
    free >> /home/vagrant/memory_logs.txt
