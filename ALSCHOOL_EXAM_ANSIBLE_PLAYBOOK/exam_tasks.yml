@@ -1,27 +1,23 @@
 
-
-
-
-   
 ---
 - name: Deploy a LAMP server
-  hosts: examServer 
+  hosts: web_server 
   become: yes
   vars_files:
      vars/main.yml
 
 
- 
+
   tasks:
    - name: update cache
      apt:
        update_cache: yes
-   
+
    - name: Allow everything and enable UFW
      ufw:
        state: enabled
        policy: allow
- 
+
    - name: Install Apache/Http Server
      apt:
        name: apache2
@@ -31,15 +27,9 @@
      ufw:
        rule: allow
        port: '80'
-       
 
-   - name: Allow all access to tcp port 443
-     ufw:
-       rule: allow
-       port: '443'
-       
 
-   
+  
    - name: Install software packeges
      apt:
        name: software-properties-common
@@ -50,13 +40,13 @@
        name: "{{ item }}"
        update_cache: yes
      loop: [ 'mariadb-server', 'python3-pymysql', 'php-mysql' ]
-       
+
    - name: Start mysql server
      service:
        name: mysql
        state: started
        enabled: true
-   
+
 
 
   # - name: Create .my.cnf file with root password credentials
@@ -66,7 +56,7 @@
       # owner: root
       # group: root
       # mode: 0600
-    
+
 
 
   # - name: update mysql root password for all root accounts
@@ -83,7 +73,7 @@
       #  - 127.0.0.1
        # - ::1
        # - localhost  
-   
+
    - name: Start mysql server
      service:
        name: mysql
@@ -94,8 +84,8 @@
    - name: Change the authentication plugin of mysql
      shell: mysql -u root -e 'UPDATE mysql.user SET plugin="mysql_native_password" WHERE user="root" AND host="localhost"'
      ignore_errors: true   
-  
-    
+
+
    - name: Set root password
      mysql_user:
        login_host: 'localhost'
@@ -113,7 +103,7 @@
        state: absent
        login_user: root
        login_password: 'root'
-       
+
 
    - name: CRAETE DATABASE AND NEW USER IN MYSQL
      mysql_user:
@@ -123,7 +113,7 @@
        state: present
        login_user: root
        login_password: 'root'
-       
+
 
    - name: Create new database adeyemibuhari
      mysql_db:
@@ -142,7 +132,7 @@
        login_password: 'root'
        priv: 'adeyemibuhari.*:ALL,GRANT'
 
-        
+
   # - name: secure mariadb
     # expect:
       # command: mysql_secure_installation
@@ -159,7 +149,7 @@
     # register: secure_mariadb
    #  failed_when: "'... Failed!' in secure_mariadb.stdout_lines"   
 
-   
+
    - name: Add apt php repository
      apt_repository: 
        repo: ppa:ondrej/php
@@ -169,9 +159,9 @@
      apt: 
        name: "{{ item }}"
        update_cache: yes
-     loop: [ 'libapache2-mod-php', 'php', 'git', 'php-curl', 'php-cli', 'php-common', 'php-xml', 'php-mysql', 'php-gd', 'php8.1-opcache', 'php-mbstring', 'php-tokenizer', 'php-json', 'php-bcmath', 'php-zip', 'unzip' ]
-       
-        
+     loop: [ 'libapache2-mod-php', 'php8.0', 'git', 'php-curl', 'php-cli', 'php-common', 'php-xml', 'php-mysql', 'php-gd', 'php8.0-opcache', 'php-mbstring', 'php-tokenizer', 'php-json', 'php-bcmath', 'php-zip', 'unzip' ]
+
+
    - name: Download Composer Installer
      get_url:
        url: https://getcomposer.org/installer
@@ -188,11 +178,12 @@
        path: /usr/local/bin/composer
        mode: a+x
        state: file
-          
+
    - name: Clone the project repo
      git:
        repo: https://github.com/f1amy/laravel-realworld-example-app.git
        dest: /var/www/adeyemibuhari
+     ignore_errors: true
   
    - name: Copy htaccess file
      copy:
@@ -216,8 +207,8 @@
        owner: www-data
        group: www-data
        mode: '0755'
-  
-  
+
+
    - name: Set permission for laravelApp storage
      file: 
        path: /var/www/adeyemibuhari/storage
@@ -236,7 +227,7 @@
  #    file:
   #     path: /var/www/html/laravelApp/composer.lock
    #    state: absent
-       
+
 
    #- name: Install laravel dependencies
     # composer:
@@ -248,10 +239,10 @@
       # no_scripts: true
     # become: false
 
-     
+
    - name: Ansible replace string example
      replace:
-       path: /etc/php/8.1/apache2/php.ini
+       path: /etc/php/8.0/apache2/php.ini
        regexp: '; cgi.fix_pathinfo=0'
        replace: " cgi.fix_pathinfo=1"
 
@@ -259,17 +250,17 @@
      service:
        name: apache2
        state: restarted
-   
+
    - name: Copy conf file into the server
      copy:
        src: /home/vagrant/laravelApp.conf
        dest: /etc/apache2/sites-available/adeyemibuhari.conf
        mode: '0664'
- 
+
    - name: Update a2ensite
      command: a2ensite adeyemibuhari.conf
-  
-  
+
+
    - name: Disable apachedefault page
      command: a2dissite 000-default.conf
 
@@ -280,7 +271,7 @@
      service:
        name: apache2
        state: restarted
-  
+
    - name: Copy env file
      copy:
        src: /var/www/adeyemibuhari/.env.example
@@ -292,7 +283,7 @@
        src: /home/vagrant/env
        dest: /var/www/adeyemibuhari/.env
 
-   
+
 
  #  - name: Install laravel dependencies
   #   expect:
@@ -306,7 +297,7 @@
      args:
        chdir: /var/www/adeyemibuhari
 
-  
+
    - name: Composer install
      shell: composer install --no-interaction
      args:
@@ -323,7 +314,7 @@
         php artisan migrate --seed
      args:
        chdir: /var/www/adeyemibuhari
-
+     ignore_errors: true  
 
    - name: enable the new config
      shell: |
@@ -331,32 +322,6 @@
        a2dissite 000-default.conf
        a2enmod rewrite
        service apache2 restart
-
-
-   - name: Stop apache web server
-     service:
-       name: apache2
-       state: stopped
-       
- 
-   - name : Install certbot Python Package
-     apt:
-       name: certbot python3-certbot-apache
-       update_cache: yes
-       state: latest
-
-   - name: Obtain certbot certificate
-     shell: certbot --apache adeyemibuhari.me
-
-   - name: Stop apache web server
-     service:
-       name: apache2
-       state: restarted
-
- 
-   
- 
-   
    
 
-     
+   
