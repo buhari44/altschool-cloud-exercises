@@ -1,0 +1,23 @@
+
+---
+- name: Deploy a LAMP server
+  hosts: web_server 
+  become: yes
+
+
+  tasks:
+   - name: update cache
+     apt:
+       update_cache: yes
+
+
+   - name: copy postgresql bash script to server
+     copy:
+       src: /home/vagrant/PSQL-BASH-Install
+       dest: /home/ubuntu/
+
+      
+
+   - name: Install and Configure PostgreSql at startup
+     shell: bash /home/ubuntu/PSQL-BASH-Install/psql-install.sh
+
