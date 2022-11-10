@@ -1,7 +1,9 @@
 
+
+
 ---
-- name: Deploy a LAMP server
-  hosts: web_server 
+- name: Deploy a LAMP stack
+  hosts: web_server
   become: yes
   vars_files:
      vars/main.yml
@@ -13,21 +15,23 @@
      apt:
        update_cache: yes
 
+
    - name: Allow everything and enable UFW
      ufw:
        state: enabled
        policy: allow
+
 
    - name: Install Apache/Http Server
      apt:
        name: apache2
        state: present
 
+
    - name: Allow all access to tcp port 80
      ufw:
        rule: allow
        port: '80'
-
 
   
    - name: Install software packeges
@@ -39,40 +43,8 @@
      apt:
        name: "{{ item }}"
        update_cache: yes
-     loop: [ 'mariadb-server', 'python3-pymysql', 'php-mysql' ]
+     loop: [ 'mariadb-server', 'python3-pymysql' ]
 
-   - name: Start mysql server
-     service:
-       name: mysql
-       state: started
-       enabled: true
-
-
-
-  # - name: Create .my.cnf file with root password credentials
-    # template:
-      # src: /home/vagrant/my.cnf
-      # dest: /root/.my.cnf
-      # owner: root
-      # group: root
-      # mode: 0600
-
-
-
-  # - name: update mysql root password for all root accounts
-   #  mysql_user:
-    #    login_user: root
-     #   login_password: ''
-      #  name: root
-       # host: "{{ item }}"
-        #password: "{{ mysql_root_password }}"
-     #   check_implicit_admin: yes
-      #  priv: "*.*:ALL,GRANT"
-    # with_items:
-     #   - ansible_hostname
-      #  - 127.0.0.1
-       # - ::1
-       # - localhost  
 
    - name: Start mysql server
      service:
@@ -95,6 +67,7 @@
        password: 'root'
        state: present
        login_unix_socket: /var/run/mysqld/mysqld.sock
+
 
    - name: Remove all anonymous user accounts
      mysql_user:   
@@ -123,6 +96,7 @@
        login_user: root
        login_password: 'root'
 
+
    - name: Grant user all access
      mysql_user:
        name: 'adeyemibuhari'
@@ -133,45 +107,37 @@
        priv: 'adeyemibuhari.*:ALL,GRANT'
 
 
-  # - name: secure mariadb
-    # expect:
-      # command: mysql_secure_installation
-      # responses:
-        # (?i)Enter current password for root: ''
-        # (?i)Change the root password: "y"
-        # (?i)New passord: "isphanggge"
-       #  (?i)Re-enter password: "isphanggge"
-        # (?i)Remove anonymous users: "y"
-        # (?i)Disallow root login remotely: "y"
-        # (?i)Remove test database: "y"
-      #   (?i)Reload privilege tables now: "y"
-     #  timeout: 1
-    # register: secure_mariadb
-   #  failed_when: "'... Failed!' in secure_mariadb.stdout_lines"   
-
 
    - name: Add apt php repository
      apt_repository: 
        repo: ppa:ondrej/php
        state: present
 
+
    - name: Install PHP and packages
      apt: 
        name: "{{ item }}"
        update_cache: yes
-     loop: [ 'libapache2-mod-php', 'php8.0', 'git', 'php-curl', 'php-cli', 'php-common', 'php-xml', 'php-mysql', 'php-gd', 'php8.0-opcache', 'php-mbstring', 'php-tokenizer', 'php-json', 'php-bcmath', 'php-zip', 'unzip' ]
+     loop: [ 'libapache2-mod-php', 'php8.1', 'git', 'php-curl', 'php-cli', 'php-common', 'php-xml', 'php-gd', 'php8.1-opcache', 'php-mbstring', 'php-tokenizer', 'php-json', 'php-bcmath', 'php-zip', 'unzip' ]
 
 
+   - name: install php driver module
+     shell: sudo apt-get install php8.1-mysql
+
+  
    - name: Download Composer Installer
      get_url:
        url: https://getcomposer.org/installer
        dest: /tmp/composer
 
+
    - name: Install Composer
      shell: php /tmp/composer --install-dir=/usr/local/bin
 
+
    - name: Move composer 
      shell: mv /usr/local/bin/composer.phar /usr/local/bin/composer
+
 
    - name: Set permission for composer file
      file:
@@ -179,26 +145,30 @@
        mode: a+x
        state: file
 
+
    - name: Clone the project repo
      git:
        repo: https://github.com/f1amy/laravel-realworld-example-app.git
        dest: /var/www/adeyemibuhari
-     ignore_errors: true
+     
   
    - name: Copy htaccess file
      copy:
        src: /home/vagrant/htaccess
        dest: /var/www/adeyemibuhari/.htaccess
 
+
    - name: delete web.php
      file: 
        path: /var/www/adeyemibuhari/routes/web.php
        state: absent
 
+
    - name: Copy /routes/web.php
      copy:
        src: /home/vagrant/web.php
        dest: /var/www/adeyemibuhari/routes/web.php
+
 
    - name: Change the ownership of the project folder
      file:
@@ -213,8 +183,9 @@
      file: 
        path: /var/www/adeyemibuhari/storage
        recurse: yes
+       owner: www-data
+       group: www-data
        mode: '0775'
-
 
 
    - name: Set permission for laravelApp storage
@@ -223,22 +194,6 @@
        recurse: yes
        mode: '0777'
 
-#   - name: Delete composer.lock file
- #    file:
-  #     path: /var/www/html/laravelApp/composer.lock
-   #    state: absent
-
-
-   #- name: Install laravel dependencies
-    # composer:
-   #    command: update
-  #     working_dir: /var/www/html/laravelApp
-      # prefer_dist: true
-       #optimize_autoloader: true
-      # no_dev: true
-      # no_scripts: true
-    # become: false
-
 
    - name: Ansible replace string example
      replace:
@@ -246,16 +201,19 @@
        regexp: '; cgi.fix_pathinfo=0'
        replace: " cgi.fix_pathinfo=1"
 
+
    - name: Restart apache webserver
      service:
        name: apache2
        state: restarted
+
 
    - name: Copy conf file into the server
      copy:
        src: /home/vagrant/laravelApp.conf
        dest: /etc/apache2/sites-available/adeyemibuhari.conf
        mode: '0664'
+
 
    - name: Update a2ensite
      command: a2ensite adeyemibuhari.conf
@@ -264,34 +222,69 @@
    - name: Disable apachedefault page
      command: a2dissite 000-default.conf
 
+
    - name: Enable apache rewrite module
      command: a2enmod rewrite
+
 
    - name: Restart apache webserver
      service:
        name: apache2
        state: restarted
 
-   - name: Copy env file
+   - name: Copy .env.example file to .env
      copy:
        src: /var/www/adeyemibuhari/.env.example
        remote_src: yes
        dest: /var/www/adeyemibuhari/.env
 
-   - name: Copy env file
-     copy:
-       src: /home/vagrant/env
+
+   # Edit .env to contain database configuration
+   - name: set DB_CONNECTION
+     lineinfile: 
        dest: /var/www/adeyemibuhari/.env
+       regexp: '^DB_CONNECTION='
+       line: DB_CONNECTION=mysql
 
 
+   - name: set DB_HOST
+     lineinfile:    
+       dest: /var/www/adeyemibuhari/.env
+       regexp: '^DB_HOST='    
+       line: DB_HOST=localhost
 
- #  - name: Install laravel dependencies
-  #   expect:
-   #    chdir: /var/www/adeyemibuhari
-    #   command: sudo composer update
-     #  responses:
-      #   (?i)Continue as root/super user: "yes"
+  
+   - name: set DB_PORT
+     lineinfile:
+       dest: /var/www/adeyemibuhari/.env
+       regexp: '^DB_PORT='
+       line: DB_PORT=3306
 
+
+   - name: set DB_DATABASE NAME
+     lineinfile:
+       dest: /var/www/adeyemibuhari/.env
+       regexp: '^DB_DATABASE='
+       line: DB_DATABASE=adeyemibuhari
+
+
+   - name: set DB_DATABASE USERNAME
+     lineinfile:
+       dest: /var/www/adeyemibuhari/.env
+       regexp: '^DB_USERNAME='
+       line: DB_USERNAME=adeyemibuhari
+
+
+   - name: set DB_PASSWORD
+     lineinfile:
+       dest: /var/www/adeyemibuhari/.env
+       regexp: '^DB_PASSWORD='
+       line: DB_PASSWORD=adeyemibuhari
+
+
+ 
+
+############------UPDATE COMPOSER--------###########
    - name: Composer update
      shell: composer update --no-interaction
      args:
@@ -303,18 +296,20 @@
      args:
        chdir: /var/www/adeyemibuhari
 
+
    - name: Composer create projet
      shell: composer create-project --no-interaction
      args:
        chdir: /var/www/adeyemibuhari
 
+
    - name: Migrate database
      shell: |
-        php artisan migrate
-        php artisan migrate --seed
+       php artisan migrate
+       php artisan migrate --seed
      args:
        chdir: /var/www/adeyemibuhari
-     ignore_errors: true  
+       
 
    - name: enable the new config
      shell: |
@@ -324,4 +319,48 @@
        service apache2 restart
    
 
+
+ ########------INSTALLING AND CONFIGURING OF LETSENCRYPT------##########   
+   - name : Install Python Package
+     apt: 
+       name: python3
+       update_cache: yes 
+       state: latest
+
+
+   - name: Stop apache webserver
+     service:
+       name: apache2
+       state: stopped
+
+
+   - name : Install Let's Encrypt Package
+     apt: 
+       name: "{{ certbot_package }}"
+       update_cache: yes 
+       state: latest
+
+ 
+   - name: Create and Install Cert Using {{ certbot_plugin }} Plugin
+     command: 'certbot --"{{ certbot_plugin }}" -d adeyemibuhari.me -m "{{ certbot_mail_address }}" --agree-tos --noninteractive --redirect'
+ 
    
+   - name: Set Letsencrypt Cronjob for Certificate Auto Renewal
+     cron: 
+       name: letsencrypt_renewal 
+       special_time: monthly 
+       job: "/usr/bin/certbot renew"
+     when: ansible_facts['os_family'] == "Debian"
+
+
+   - name: Allow all access to tcp port 80
+     ufw:
+       rule: allow
+       port: '443'
+
+
+   - name: Restart apache webserver
+     service:
+       name: apache2
+       state: restarted
+
